@@ -1,0 +1,212 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using HelperClass;
+using Business;
+using Objects;
+using NPOI.SS.UserModel;
+using NPOI.XSSF.UserModel;
+using System.Globalization;
+namespace WorkSpaceConsole
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            ExportDB(@"C:\Users\murat.ozhan\Desktop\ferh.xlsx");
+        }
+        public static string ConvertToEnglish(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            StringBuilder result = new StringBuilder(input.Length);
+
+            foreach (char c in input.ToLower())
+            {
+                switch (c)
+                {
+                    case 'ç':
+                        result.Append('c');
+                        break;
+                    case 'ğ':
+                        result.Append('g');
+                        break;
+                    case 'ı':
+                        result.Append('i');
+                        break;
+                    case 'ö':
+                        result.Append('o');
+                        break;
+                    case 'ş':
+                        result.Append('s');
+                        break;
+                    case 'ü':
+                        result.Append('u');
+                        break;
+
+                    default:
+                        result.Append(c);
+                        break;
+                }
+            }
+
+            return result.ToString();
+        }
+        public static void ExportDB(string excelFilePath = "")
+        {
+            var firmManager = new FirmManager();
+            var provinceManager = new ProvinceManager();
+            var countyManager = new CountyManager();
+            var firmSectorManager = new FirmSectorManager();
+            var firmTitleManager = new FirmTitleManager();
+            var appUserManager = new AppUserManager();
+            var firmStatusManager = new FirmStatusManager();
+            var firmAreaManager = new FirmAreaManager();
+            try
+            {
+                using (FileStream fs = new FileStream(excelFilePath, FileMode.Open, FileAccess.Read))
+                {
+                    XSSFWorkbook workbook = new XSSFWorkbook(fs);
+                    XSSFSheet sheet = (XSSFSheet)workbook.GetSheetAt(0); 
+
+                    int rowCount = sheet.LastRowNum;
+                    
+                    IRow headerRow = sheet.GetRow(0);
+                    for (int rowIndex = 1; rowIndex <= rowCount; rowIndex++)
+                    {
+                        var cellNumber = 0;
+                        IRow row = sheet.GetRow(rowIndex);
+                        if (row == null) continue;
+
+                        var firm = new Firm();
+
+                        firm.OldFirmId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+
+                        
+                        var ApplicantUserName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var ApplicantUser = appUserManager.GetAppUsers().Find(a => ConvertToEnglish(a.NameSurname) == ApplicantUserName);
+                        firm.ApplicantUserId = ApplicantUser == null ? 0 : ApplicantUser.Id;
+
+
+                        var memberShipUserName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var memberShipUser = appUserManager.GetAppUsers().Find(a => ConvertToEnglish(a.NameSurname) == memberShipUserName);
+                        firm.MemberShipUserId = memberShipUser == null ? 0 : memberShipUser.Id;
+
+                        firm.CancelUserId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        firm.Name = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+
+                        var countyName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var provinceName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var county =countyManager.GetCounties().Find(a => ConvertToEnglish(a.Name) == countyName);
+                        var province = provinceManager.GetProvinces().Find(a => ConvertToEnglish(a.Name) == provinceName);
+                        if (province != null)
+                        {
+                            firm.ProvinceId = province.Id;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                firm.ProvinceId = county.ProvinceId;
+                            }
+                            catch 
+                            {
+                                firm.ProvinceId = 0;
+                            }
+                            
+                        }
+
+                        if (county != null)
+                        {
+                            firm.CountyId = county.Id;
+                        }
+                        else
+                        {
+                            firm.CountyId = 0;
+                        }
+                        
+
+                        cellNumber++;
+                        firm.Address = "0";
+
+
+                        //firm.FirmSectorId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        var firmSectorName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var firmSector = firmSectorManager.GetFirmSectors().Find(a => ConvertToEnglish(a.Name) == firmSectorName);
+                        firm.FirmSectorId = firmSector == null ? 0 : firmSector.Id;
+
+                        //firm.FirmTitleId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        var firmTitleName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var firmTitle = firmTitleManager.GetFirmTitles().Find(a => ConvertToEnglish(a.Name) == firmTitleName);
+                        firm.FirmTitleId = firmTitle == null ? 0 : firmTitle.Id;
+
+                        cellNumber++;
+                        firm.BrandName = "0";
+
+                        //firm.BrokerUserId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        var brokerUserName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var brokerUser = appUserManager.GetAppUsers().Find(a => ConvertToEnglish(a.NameSurname) == brokerUserName);
+                        firm.BrokerUserId = brokerUser == null ? 0 : brokerUser.Id;
+
+                        //firm.RepresentativeUserId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        var representativeUserName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var representativeUser = appUserManager.GetAppUsers().Find(a => ConvertToEnglish(a.NameSurname) == representativeUserName);
+                        firm.RepresentativeUserId = representativeUser == null ? 0 : representativeUser.Id;
+
+                        //firm.FollowedBrokerId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        var followedBrokerName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var followedBrokerUser = appUserManager.GetAppUsers().Find(a => ConvertToEnglish(a.NameSurname) == followedBrokerName);
+                        firm.FollowedBrokerId = followedBrokerUser == null ? 0 : followedBrokerUser.Id;
+
+
+                        //firm.FirmStatusId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        cellNumber++;
+                        firm.FirmStatusId = 2;
+
+                        //firm.FirmAreaId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+
+                        var firmAreaName = ConvertToEnglish(Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString()));
+                        var firmArea = firmAreaManager.GetFirmAreas().Find(a => ConvertToEnglish(a.Name) == firmAreaName);
+                        firm.FirmAreaId = firmArea == null ? 0 : firmArea.Id;
+
+                        firm.Email = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.Phone = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.Web = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.TaxOffice = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.TaxNumber = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.BarterBalance = Helper.GetDataColumnValue_Decimal(row.GetCell(cellNumber++)?.ToString());
+                        firm.FirmBalance = Helper.GetDataColumnValue_Decimal(row.GetCell(cellNumber++)?.ToString());
+                        firm.CommissionRateSupply = Helper.GetDataColumnValue_Decimal(row.GetCell(cellNumber++)?.ToString());
+                        firm.CommissionRateDemand = Helper.GetDataColumnValue_Decimal(row.GetCell(cellNumber++)?.ToString());
+                        firm.NegativeBalanceAmount = Helper.GetDataColumnValue_Decimal(row.GetCell(cellNumber++)?.ToString());
+                        firm.SupplyPaymentTypeId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        firm.DemandPaymentTypeId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        firm.IsDocument = Helper.GetDataColumnValue_Bool(row.GetCell(cellNumber++)?.ToString());
+
+                        firm.IsMemberKDV = Helper.GetDataColumnValue_Bool(row.GetCell(cellNumber++));
+                        
+                        firm.ReferenceId = Helper.GetDataColumnValue_Int(row.GetCell(cellNumber++)?.ToString());
+                        firm.CreateTime = Helper.GetDataColumnValue_DateTime(Helper.GetDataColumnValue_StringExcel(row.GetCell(cellNumber++).ToString()));
+                        firm.MemberShipDate = Helper.GetDataColumnValue_DateTime(Helper.GetDataColumnValue_StringExcel(row.GetCell(cellNumber++).ToString()));
+                        firm.CancelDate = Helper.GetDataColumnValue_DateTime(Helper.GetDataColumnValue_StringExcel(row.GetCell(cellNumber++).ToString()));
+                        firm.CancelDescription = Helper.GetDataColumnValue_String(row.GetCell(cellNumber++)?.ToString());
+                        firm.LastProcessDate = Helper.GetDataColumnValue_DateTime(Helper.GetDataColumnValue_StringExcel(row.GetCell(cellNumber++).ToString()));
+                        firm.ActiveFlg = Helper.GetDataColumnValue_Bool(row.GetCell(cellNumber++)?.ToString());
+
+                        firmManager.Save(firm);
+                    }
+
+                    workbook.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Hata: " + ex.Message);
+            }
+        }
+    }
+}
